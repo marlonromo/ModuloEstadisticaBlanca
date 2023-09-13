@@ -1,0 +1,457 @@
+---
+title: "Portafolio Implementacion"
+author: "Marlon Brandon Romo Lopez"
+date: "2023-09-08"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+M1=read.csv("C:/Users/marlo/OneDrive/Documentos/Semestre 7/Inteligencia artificial avanzada para la ciencia de datos/Modulo1_Estadistica_Blanca/Estadistico1.csv")
+```
+
+### Anova
+
+En relación a este enfoque, planeamos desarrollar un modelo que se centre en un único factor. Esto se debe a la inversión significativa de tiempo y al hecho de que, al elegir únicamente las variables categóricas, hemos optado por incluir solamente la variable "drivewheel"
+
+## 1. Hipótesis estadísticas 
+"Hipotesis del modelo ANOVA"
+$H_0:\tau_i=0$
+$H_1:$ algun $\tau_i\neq0$
+
+Para este caso solo tenemos una hipoetsis.
+
+"Regla de decision"
+
+Nivel de significancia $\alpha=0.05$
+
+Si p-value < $\alpha$ se rechaza $H_0$
+
+
+
+## 2. Realiza el ANOVA para un nivel:
+```{r}
+# Convierte la columna drivewheel en un factor
+M1$drivewheel <- factor(M1$drivewheel)
+
+# Realiza el ANOVA
+A <- aov(M1$price ~ M1$drivewheel)
+summary(A)
+
+```
+
+## 3. Grafica de interaccion de un factor
+
+```{r}
+# Carga la biblioteca necesaria si aún no está cargada
+library(ggplot2)
+
+# Crea el gráfico de interacción
+interaction.plot(x.factor = M1$drivewheel, trace.factor = M1$drivewheel, response = M1$price, type = "b")
+```
+
+Cuando observamos la grafica nos damos cuenta que los 3 valores tienen diferentes medias, podemos ver que los volantes de rwd superan en precio de los volantes 4wd y fwd.
+
+## 4. Boxplot para los volantes y media para los precios dependiendo el volante.
+```{r}
+tapply(M1$price,M1$drivewheel,mean)
+M=mean(M1$price)
+cat("La media del precios es=",M)
+boxplot(M1$price ~ M1$drivewheel)
+```
+En esta grafica podemos observar que la mediana de "rwd" supera a las medianas de "4wd" y "fwd", esto quiere decir que tiene un comportamiento diferente en relacion con la variable Anova.
+
+## 5. Intervalos de confianza 
+
+```{r}
+# Nivel de confianza (0.95)
+conf_level <- 0.95
+
+# Calcula los intervalos de confianza para el precio por tipo de volante
+ci_drivewheel <- tapply(M1$price, M1$drivewheel, function(x) t.test(x, conf.level = conf_level)$conf.int)
+
+# Crea un data frame con los intervalos de confianza
+ci_df <- data.frame(Drivewheel = levels(M1$drivewheel), CI_Lower = sapply(ci_drivewheel, "[[", 1), CI_Upper = sapply(ci_drivewheel, "[[", 2))
+
+# Imprime los intervalos de confianza
+print(ci_df)
+
+# Grafica los intervalos de confianza
+library(ggplot2)
+
+ggplot(data = ci_df, aes(y = Drivewheel, x = (CI_Lower + CI_Upper) / 2)) +
+  geom_pointrange(aes(xmin = CI_Lower, xmax = CI_Upper, color = Drivewheel), size = 1) +
+  labs(title = "Intervalos de Confianza de Precio por Tipo de Volante",
+       x = "Intervalo de Confianza") +
+  theme_minimal()
+```
+
+
+
+En esta grafica podemos ver que el volante "rwd" no muestra superposicion a diferencia del "fwd" y "4wd" que si muestran superposicion, eso indifica que la media de rwd es diferente a las demas.
+
+##1.7.Interpretacion Estadistica para el ANOVA 
+
+El análisis de varianza (ANOVA) mostro diferencias de precio significativas entre vehículos con diferentes tipos de tracción (fwd, 4wd y rwd). En particular, los vehículos de tracción trasera (rwd) tuvieron precios notoriamente diferentes de los vehículos de tracción delantera (fwd) y tracción en las cuatro ruedas (4wd). Los precios de los vehículos con tracción delantera y tracción en las cuatro ruedas probablemente no difieren significativamente entre sí, según los intervalos de confianza.
+
+
+##1.8.Prueba de comparaciones múltiples de Tukey Y Grafica de los intervalos de confianza de Tukey. 
+```{r}
+I = TukeyHSD(A,conf.level = 0.95)
+I
+plot(I) 
+```
+
+##1.9.Interpretacion Estadistica para la prueba de Tukey
+
+
+En este analisis, se destacaron los volantes de fwd y 4wd, ya que el valor es mayor a alpha. Estas dos categorias mostraron que tienen medias iguales, y en comparacion de rwd y fwd los valores de p son menores a alpha, lo que significa que se rechaza la hipotesis nula en estos casos.En la grafica se observa que fwd y 4wd estan en el valor 0, asi que no hay diferencia significativa entre ellas.
+
+
+
+###2.Comprobacion de la validez del modelo:
+
+##2.1.Normalidad
+
+"Hipotesis sobre el modelo"
+
+$H_0$: Los datos provienen de una poblacion normal.
+$H_1$: Los datos no provienen de un poblacion normal.
+
+
+"Regla de decision"
+
+El nivel de significancia para nuestras hipotesis es: $\alpha=0.05$
+
+Se rechaza $H_0$ si el p-value < $\alpha$
+
+```{r}
+residuos=A$residuals
+qqnorm(residuos)
+qqline(residuos)
+```
+```{r}
+E=A$residuals
+Y=A$fitted.values
+
+hist(E,col="lightcyan",freq=FALSE,main="Histograma de Residuos",ylim=c(0,0.6),xlab="",ylab="Densidad")
+lines(density(E),col="red")
+curve(dnorm(x,mean=mean(E),sd=sd(E)), add=TRUE, col="blue",lwd=2)
+```
+
+
+```{r}
+library(nortest)
+ad.test(A$residuals)
+```
+
+Con esta prueba obtuvimos un p-value de 0.209, que es mas alto que alpha, esto significa que puede rechazar la hipotesis Nula. Concluimos que los residuos siguen una distribucion normal.
+
+##2.2.Verificación de media cero
+"Hipotesis de la media"
+
+$H_0$: $\mu=0$
+$H_1$: $\mu\neq0$
+
+"Regla de decision"
+
+El nivel de significancia para nuestras hipotesis es: $\alpha=0.05$
+
+Se rechaza $H_0$ si el p-value < $\alpha$
+
+```{r}
+t.test(A$residuals)
+```
+
+
+
+##2.3.Homocedasticidad
+```{r}
+
+
+plot(Y,E,ylab="Residuos",xlab="Valores estimados",pch=20,col="red")
+abline(h=0,col="red")
+text(Y[],E[],1:30,cex=0.8,pos=3,offset=0.2)
+
+```
+
+##2.4.Independencia
+"Hipotesis"
+
+$H_0$: $\rho= 0$ (autocorrelación nula)
+$H_0$: $\rho\neq0$  
+
+"Regla de decision"
+
+El nivel de significancia para nuestras hipotesis es: $\alpha=0.05$
+
+Se rechaza $H_0$ si el p-value < $\alpha$
+
+Errores vs Orden de observación
+
+```{r}
+n=length(M1$price)
+plot(c(1:n),A$residuals,type="l",xlab="Orden de las observaciones",ylab="Residuos")
+abline(h=0,col="red")
+```
+
+```{r}
+library(car)
+library(carData)
+
+dwt(A,alternative="two.sided")
+
+```
+
+En este caso, el valor p-value es menor a alpha, asi que se rechaza la hipotesis Nula de esta prueba.
+
+##2.5.Relación lineal entre las variables (coeficiente de determinación) y eacuacion del modelo.
+
+```{r}
+#coeficiente de determinación para el modelo
+CD= 94.9/(94.9+47.45) 
+cat("El coeficiente de determinación del modelo es=",CD)
+```
+
+##2.6.Conclusion del modelo en el contexto del problema
+
+En este estudio, realizamos un análisis para ver cómo el tipo de tracción de los vehículos (fwd, 4wd y rwd) se relaciona con sus precios. Descubrimos que hay diferencias importantes en los precios entre al menos dos grupos de tracción. En particular, los vehículos de tracción trasera (rwd) son más caros en promedio que los vehículos de tracción delantera (fwd) y tracción en las cuatro ruedas (4wd). Sin embargo, cuando comparamos los precios de los vehículos de tracción delantera (fwd) y tracción en las cuatro ruedas (4wd) no encontramos diferencias significativas. Además, el tipo de tracción explica aproximadamente el 66.67% de la variación en los precios de los vehículos.
+
+
+###3.Regresion lineal Multiple
+
+
+Con este analisis Anova obtuvimos el 66.67% de variabilidad en nuestros datos de nuestro modelo.
+
+##3.1.Hipotesis estadisticas
+
+Significancia global
+$H_0$: $\beta_0=\beta_1=\beta_2=\beta_3=\beta_4=\beta_5$
+$H_1$: $\beta_i\neq0$
+
+Significancia individual
+$H_0$: $\beta_i=0$
+$H_1$: $\beta_i\neq0$
+
+"Regla de decision"
+
+El nivel de significancia para nuestras hipotesis es: $\alpha=0.05$
+
+significancia global:
+si p-value<$\alpha$ se rechaza la hipotesis Nula 
+
+
+significancia individual: se rechaza la hipotesis Nula 
+si p-value<$\alpha$
+
+##3.2.Realizamos una Regresion lineal multiple
+
+```{r}
+#Realiza regresion lineal multipla
+R=lm(M1$price~M1$horsepower+M1$carlength+M1$enginesize+M1$curbweight+M1$carwidth+M1$fwd+M1$rwd+M1$X4wd,data=M1)
+summary(R)
+```
+
+
+##3.3.Colinealidad de las variables involucradas (coeficiente de correlación)
+```{r}
+# Obtener los coeficientes de correlación de Pearson entre las variables predictoras y la variable de respuesta
+correlations <- cor(M1[, c("horsepower", "carlength", "enginesize", "curbweight","carwidth")], M1$price)
+
+# Imprimir los coeficientes de correlación
+print(correlations)
+```
+Para todas las variables seleccionadas, existe una alta correlacion con nuestra variable objetivo "price".
+
+##3.4.Economía del modelo (criterio de Akaike)
+
+```{r}
+step(R,direction="both",trace=1) 
+```
+
+##3.5.Significancia global del modelo
+
+```{r}
+R1=lm(price~horsepower+curbweight+carwidth+M1$rwd,,data=M1)
+S=summary(R1)
+S
+```
+
+```{r}
+confint(R1)
+```
+
+##3.6.Significancia individual (de β̂i)
+
+Para este caso rechazamos la Hipotesis Nula
+
+
+##3.Interpretacion en el contexto del problema
+
+Nuestro modelo es útil para predecir el precio de los vehículos y cada una de las variables que incluimos en él tiene un impacto sustancial y significativo en esa predicción, con un nivel de significancia establecido en 0.05. Es util debido a que debido a que si rechazamos la hipotesis nula, indicamos que las variables seleccionadas tienen un impacto importante y unico en el precio de los vehiculos.
+
+
+##4.Ecuacion Predictora
+
+
+Nuestra ecuacion predictora resulto en:
+
+```{r}
+b0=S$coefficients[1]
+b1=S$coefficients[2]
+b2=S$coefficients[3]
+b3=S$coefficients[4]
+b4=S$coefficients[5]
+
+cat("price=",b0,"+",b1,"horsepower","+",b2,"curbweight","+",b3,"carwidth ","+",b4,"rwd")
+
+```
+###5.Comprobacion de la validez del modelo:
+
+##5.1.Normalidad
+
+"Hipotesis sobre el modelo"
+
+$H_0$: Los datos provienen de una poblacion normal.
+$H_1$: Los datos no provienen de un poblacion normal.
+
+
+"Regla de decision"
+
+El nivel de significancia para nuestras hipotesis es: $\alpha=0.05$
+
+Se rechaza $H_0$ si el p-value < $\alpha$
+
+```{r}
+residuos=R1$residuals
+qqnorm(residuos)
+qqline(residuos)
+```
+```{r}
+E1=R1$residuals
+Y1=R1$fitted.values
+
+hist(E,col="lightcyan",freq=FALSE,main="Histograma de Residuos",ylim=c(0,0.6),xlab="",ylab="Densidad")
+lines(density(E),col="red")
+curve(dnorm(x,mean=mean(E),sd=sd(E)), add=TRUE, col="blue",lwd=2)
+```
+
+
+```{r}
+library(nortest)
+ad.test(R1$residuals)
+```
+
+Con esta prueba obtuvimos un de 0.08602 de p-value, que es superior al nivel de significancia establecio. Esto indicai que no podemos rechazar la hipotesis nula debido a falta de informacion.
+
+##5.2.Verificación de media cero
+"Hipotesis de la media"
+
+$H_0$: $\mu=0$
+$H_1$: $\mu\neq0$
+
+"Regla de decision"
+
+El nivel de significancia para nuestras hipotesis es: $\alpha=0.05$
+
+Se rechaza $H_0$ si el p-value < $\alpha$
+
+```{r}
+t.test(R1$residuals)
+```
+
+##5.3.Homocedasticidad
+```{r}
+plot(Y1,E1,ylab="Residuos",xlab="Valores estimados",pch=20,col="red")
+abline(h=0,col="red")
+text(Y1[],E1[],1:205,cex=0.8,pos=3,offset=0.2)
+
+```
+```{r}
+plot(R1$fitted.values,R1$residuals)
+abline(h=0)
+``` 
+
+##5.4.Independencia
+Hipotesis:
+
+$H_0$: $\rho= 0$ (autocorrelación nula)
+$H_0$: $\rho\neq0$  
+
+"Regla de decision"
+
+El nivel de significancia para nuestras hipotesis es: $\alpha=0.05$
+
+Se rechaza $H_0$ si el p-value < $\alpha$
+
+Errores vs Orden de observación
+
+```{r}
+n=length(M1$price)
+plot(c(1:n),R1$residuals,type="l",xlab="Orden de las observaciones",ylab="Residuos")
+abline(h=0,col="red")
+```
+Observamos en la grafica que no hay correlación
+
+```{r}
+library(car)
+dwt(R1,alternative="two.sided")
+
+```
+
+##5.5.Conclusion del modelo en el contexto del problema
+
+
+Por todo lo observado de los datos en las graficas, podemos concluir que nuestro modelo de regresion multiple es muy fundamental para la prediccion de los precios de los autos, y en base a eso podemos tomar decisiones importantes y precisas.
+
+
+
+###6.Datos influyentes y atipicos
+
+#6.1.Si hay datos atípicos o datos que influyan en el modelo.
+
+No se encuentran datos atipicos.
+
+
+##6.3.Datos influyentes
+
+```{r}
+summary(influence.measures(R1))
+```
+
+```{r}
+influence.measures(R1)
+
+```
+
+```{r}
+library(car)
+influencePlot(R1)
+```
+```{r}
+# Calcula los valores Hat y Cook's D
+influence <-summary(influence.measures(R1))
+
+# Crear un data.frame con 8 columnas
+influence<- data.frame(influence)
+                    
+# Inicializa la columna "Observaciones_a_Remover" en M1 con ceros
+M1$Observaciones_a_Remover <- 0
+
+# Marca las observaciones que cumplen con los criterios con un 1
+M1$Observaciones_a_Remover[row.names(M1) %in% row.names(influence[influence$hat > 0.0609, ])] <- 1
+
+```
+
+
+###6.5.Conclusion final de ambos modelos
+
+En el análisis realizado, se evaluaron dos modelos estadísticos: un ANOVA de un solo factor considerando el tipo de tracción y una regresión lineal múltiple que incorpora múltiples variables numéricas. En ambos casos, hemos encontrado resultados significativos que proporcionan información valiosa.
+
+
+Principalmente los modelos que se utilizaron fue el de Anova de un solo factor y el de regresion lineal multiple, nuestra conclusion para cada uno de los modelos, es que empezando con el de Anova nos permitio ver el tipo de traccion tiene un impacto significativo en el precio de los autos. Lo que observamos es que el fwd y 4wd tiene precios mas bajos en comparacion con el de rwd, pero el unico problema con el modelo de Anova es que la prueba de la independencia de los errores no la supero, este problema puede llegar a surgir despues porque puede haber correlacion.
+
+El modelo de regresion lineal multiple incorporo diferentes variables y llego a un 86.44% de la variablidad de los precios de los autos. Se mostro una gran significancia entre cada una de las variables y presento correlacion tambien. Asi que en mi conclusion, el modelo de regresion lineal multiple es mejor debido a que es mas preciso para ver el precio exacto de los autos.
+
