@@ -1,0 +1,587 @@
+---
+title: "Portafolio"
+author: "Marlon Romo"
+date: "2023-08-26"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(purrr)
+library(tidyverse)
+library(GGally)
+
+# Leer dataframe
+M=read.csv("C:/Users/marlo/OneDrive/Documentos/Semestre 7/Inteligencia artificial avanzada para la ciencia de datos/Modulo1_Estadistica_Blanca/precios_autos.csv") 
+# Seleccionar columnas numéricas
+Variables_cuantitativas <- M[sapply(M, is.numeric)]
+
+# Seleccionar columnas categóricas
+Variables_cualitativas <- M[sapply(M, function(x) is.factor(x) || is.character(x))]
+
+```
+
+
+# Calcula medidas estadísticas apropiadas para las variables cuantitativas (media, desviación estándar, cuantiles, etc) y para las cualitativas (cuantiles, frecuencias)
+
+# Variables cuantitativas 
+
+```{r}
+# Calcular resumen estadístico para las variables cuantitativas
+summary_stats <- Variables_cuantitativas %>%
+  summarize(across(everything(), list(Medias = ~mean(.),
+  Desviaciones_Estandar = ~sd(.),
+  Medianas = ~median(.),
+  Cuantiles_25 = ~quantile(., probs = 0.25),
+  Cuantiles_75 = ~quantile(., probs = 0.75))))
+
+# Imprimir resumen estadístico
+print(summary_stats)
+
+```
+# Variables Cualitativas
+
+```{r}
+# Contar frecuencias de las variables cualitativas
+frecuencias <- apply(Variables_cualitativas, 2, function(col) table(col))
+
+# Imprimir frecuencias
+cat("Frecuencias para variables cualitativas:\n")
+print(frecuencias)
+```
+# Explora los datos usando herramientas de visualización:
+
+# Variables cuantitativas: Medidas de posición: cuartiles, outlier (valores atípicos), boxplots
+```{r}
+
+# Función para crear boxplots y mostrar información
+create_boxplot <- function(col, col_name) {
+  
+  # Calcular cuartiles
+  cuartiles <- quantile(col, probs = c(0.25, 0.5, 0.75))
+  
+  # Calcular el rango intercuartil
+  iqr <- IQR(col)
+  
+  # Definir límites para detectar valores atípicos
+  limite_inferior <- cuartiles[2] - 1.5 * iqr
+  limite_superior <- cuartiles[2] + 1.5 * iqr
+  
+  # Identificar valores atípicos
+  valores_atipicos <- col[col < limite_inferior | col > limite_superior]
+  
+  # Crear un boxplot
+  p <- ggplot(data = data.frame(y = col), aes(x = 1, y = y)) +
+    geom_boxplot() +
+    labs(title = paste("Boxplot de", col_name),
+         x = NULL,
+         y = col_name) +
+    theme_minimal()
+  
+  # Imprimir resultados
+  cat("Variable:", col_name, "\n")
+  cat("Cuartiles:", cuartiles, "\n")
+  cat("Rango Intercuartil (IQR):", iqr, "\n")
+  cat("Valores atípicos:", valores_atipicos, "\n\n")
+  
+  # Imprimir boxplot
+  print(p)
+}
+
+# Aplicar la función a cada columna cuantitativa
+quantitative_col_names <- colnames(Variables_cuantitativas)
+lapply(seq_along(quantitative_col_names), function(i) {
+  create_boxplot(Variables_cuantitativas[[i]], quantitative_col_names[i])
+})
+
+
+```
+
+
+# Análisis de distribución de los datos (Histogramas). Identificar si tiene forma simétrica o asimétrica
+
+```{r}
+
+# Función para crear histogramas y mostrar información
+create_histogram <- function(col, col_name) {
+  # Crear un histograma
+  p <- ggplot(data = data.frame(y = col), aes(x = y)) +
+    geom_histogram(binwidth = 1, fill = "blue", color = "black") +
+    labs(title = paste("Histograma de", col_name),
+         x = col_name,
+         y = "Frecuencia") +
+    theme_minimal()
+  
+  # Mostrar el histograma
+  print(p)
+}
+
+# Aplicar la función a cada columna cuantitativa
+quantitative_col_names <- colnames(Variables_cuantitativas)
+lapply(seq_along(quantitative_col_names), function(i) {
+  create_histogram(Variables_cuantitativas[[i]], quantitative_col_names[i])
+})
+
+```
+#2.1.3.Analiza colinealidad (coeficiente de correlación)
+
+```{r}
+
+# Calcular la matriz de correlación
+correlation_matrix <- cor(Variables_cuantitativas)
+
+# Convertir la matriz en un formato adecuado para ggplot2
+correlation_data <- as.data.frame(as.table(correlation_matrix))
+colnames(correlation_data) <- c("Variable1", "Variable2", "Correlacion")
+
+# Crear el gráfico de matriz de correlación
+correlation_plot <- ggplot(correlation_data, aes(x = Variable1, y = Variable2, fill = Correlacion)) +
+  geom_tile() +
+  scale_fill_gradient(low = "blue", high = "red") +
+  labs(title = "Matriz de Correlación",
+       x = "Variable",
+       y = "Variable") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Mostrar el gráfico
+print(correlation_plot)
+
+# Imprimir la matriz de correlación
+print(correlation_matrix)
+```
+
+# Analiza colinealidad (diagramas de dispersión)
+```{r}
+# Crear un pairplot para las variables cuantitativas
+pair_plot <- ggpairs(Variables_cuantitativas)
+
+# Mostrar el pairplot
+print(pair_plot)
+```
+# Variables categóricas, Distribución de los datos (diagramas de barras)
+```{r}
+# Crear una función para generar los gráficos de barras
+create_bar_plot <- function(data, col_name) {
+  ggplot(data = data, aes(x = factor(.data[[col_name]]))) +
+    geom_bar(fill = "blue") +
+    labs(title = paste("Diagrama de Barras de", col_name),
+         x = col_name,
+         y = "Frecuencia") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Generar una lista de gráficos de barras
+bar_plots <- lapply(colnames(Variables_cualitativas), function(col_name) {
+  create_bar_plot(Variables_cualitativas, col_name)
+})
+
+# Imprimir todos los gráficos de barras
+invisible(lapply(bar_plots, print))
+```
+# Variables categóricas, Distribución de los datos (diagramas de pastel)
+
+```{r}
+# Función para crear gráficos de pastel con porcentajes
+create_pie_chart <- function(data, col_name) {
+  freq_table <- table(data[[col_name]])
+  
+  pie_data <- data.frame(
+    Categoria = names(freq_table),
+    Frecuencia = as.numeric(freq_table),
+    Porcentaje = (as.numeric(freq_table) / sum(as.numeric(freq_table))) * 100
+  )
+  
+  pie_chart <- ggplot(pie_data, aes(x = "", y = Porcentaje, fill = Categoria)) +
+    geom_bar(stat = "identity") +
+    coord_polar(theta = "y") +
+    labs(title = paste("Gráfico de Pastel para", col_name)) +
+    theme_void() +
+    theme(legend.position = "right") +
+    geom_text(aes(label = paste(round(Porcentaje, 1), "%")),
+              position = position_stack(vjust = 0.5),
+              size = 3)
+  
+  return(pie_chart)
+}
+
+# Crear y mostrar gráficos de pastel para las variables cualitativas
+pie_charts <- map(colnames(Variables_cualitativas), ~ create_pie_chart(Variables_cualitativas, .x))
+walk(pie_charts, print)
+
+
+```
+# Analiza asociación o colinealidad (diagramas de caja y bigote de precio por categoría y barras por categoría) 
+
+```{r}
+# Lista de nombres de columnas cualitativas
+columnas_cualitativas <- colnames(Variables_cualitativas)
+
+# Un for de las columnas cualitativas y crea un boxplot para cada una de ellas
+for (col in columnas_cualitativas) {
+  p <- ggplot(M, aes(x = reorder(Variables_cualitativas[[col]], -price), y = price)) +
+    geom_boxplot(fill = "red", color = "black") +
+    labs(title = paste("Boxplot de Price por", col),
+         x = col,
+         y = "Price") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # Imprime el boxplot
+  print(p)
+}
+```
+# Analiza asociación o colinealidad (barras por categoría) 
+
+```{r}
+# Iterar a través de las columnas categóricas
+for (col in colnames(Variables_cualitativas)) {
+  freq_table <- table(Variables_cualitativas[[col]])
+  freq_df <- data.frame(Categoria = names(freq_table), Frecuencia = as.numeric(freq_table))
+  
+  p_bar <- ggplot(freq_df, aes(x = reorder(Categoria, -Frecuencia), y = Frecuencia)) +
+    geom_bar(stat = "identity", fill = "blue") +
+    labs(title = paste("Diagrama de Barras de", col),
+         x = "Categoria",
+         y = "Frecuencia") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  # Imprimir el gráfico de barras
+  print(p_bar)
+  cat("\n\n")
+}
+```
+# Analizar colinealidad en las variables categoricas  con Anova
+```{r}
+# Crear una lista para almacenar los resultados de ANOVA
+resultados_anova <- list()
+
+# For de las columnas categóricas y realizar ANOVA para cada una de ellas
+for (col in colnames(Variables_cualitativas)) {
+  anova_result <- aov(M$price ~ Variables_cualitativas[[col]])
+  resultados_anova[[col]] <- summary(anova_result)
+  
+  # Imprimir resultados de ANOVA para cada variable categórica
+  cat("Variable Categórica:", col, "\n")
+  print(resultados_anova[[col]])
+  cat("\n\n")
+}
+```
+
+Podemos analizar que las variables p de las variables categoricas CarName,fueltype,drivewheel, enginelocation,enginetype y cylindernumber obtenemos un valor minimo de cada una de ellas, esto quiere decir que son variables significativas, por lo mismo mas adelante escogi estas variables y las converti en dummy para analizarlas.
+
+# Identifica problemas de calidad de datos (valores faltantes, outliers, etc).
+El excel que nos proporcionaron no hay variables 0s, o valores faltantes.
+Y en base a los outliers si encontramos ya que algunos estan arriba del rango.
+
+
+# Con base en este análisis selecciona al menos 6 variables que consideres importantes para el análisis de las características de los automóviles que determinan su precio.
+
+CarName
+fueltype
+carbody
+drivewheel
+enginelocation
+enginetype
+cylindernumber
+
+# Preparación de la base de datos
+```{r}
+# Visualizar las primeras filas del DataFrame
+head(M)
+```
+Fueron comentadas las siguientes lineas debido a que quise implementar una forma de hacer los siguientes pasos pero no logre lograrlo, por el tiempo voy a subir asi el trabajo y los proximos dias voy a trabajar en ello para que funcione.
+
+# Selecciona el conjunto de datos a utilizar.Maneja datos categóricos: transforma a variables dummy si es necesario.
+```{r}
+# Obtener variables dummy para las columnas categóricas
+#data <- data %>%
+#  mutate_at(vars(CarName, fueltype, carbody, drivewheel, enginelocation, enginetype, cylindernumber),
+#            list(~ factor(., levels = unique(.)))) %>%
+#  mutate(across(c(CarName, fueltype, carbody, drivewheel, enginelocation, enginetype, cylindernumber),
+#                ~ as.numeric(.),
+#                .names = "{col}_dummy"))
+```
+
+
+# Maneja apropiadamente datos atípicos.
+```{r}
+# Calcular el Z-score para la columna 'price'
+#data <- data %>%
+#  mutate(price_zscore = scale(price, center = mean(price), scale = sd(price)))
+
+# Verifica si la columna price_zscore se ha calculado correctamente
+#print("Columna price_zscore:")
+#print(data$price_zscore)
+
+# Filtrar los datos que están dentro de 3 desviaciones estándar
+#data_filtered <- data %>%
+#  filter(abs(price_zscore) < 3)
+
+# Verifica si los datos filtrados tienen la estructura correcta
+#print("Datos filtrados:")
+#print(data_filtered)
+  
+# Verifica si la eliminación de la columna price_zscore funciona como se espera
+#print("Datos filtrados sin price_zscore:")
+#print(data_filtered)
+
+```
+
+
+# Transforma los datos en caso necesario. Revisa si es necesario discretizar los datos
+```{r}
+No es necesario transformar los datos ya que no hay variables categoricas para el analisis
+```
+
+
+
+# Revisa si es necesario escalar y normalizar los datos
+```{r}
+# Columnas numéricas a escalar
+#numeric_cols <- c("symboling", "wheelbase", "carlength", "carwidth", "carheight",
+#                  "curbweight", "stroke", "compressionratio", "horsepower", "peakrpm", "citympg", "highwaympg")
+
+# Z-score Scaling
+#data[numeric_cols] <- scale(data[numeric_cols])
+library(nortest)
+
+
+# Itera a través de las columnas del dataframe
+for (col in colnames(df)[1:6]) {
+  # Realiza el test de Anderson-Darling para cada columna
+  ad_test_result <- ad.test(df[[col]])
+  
+  # Imprime los resultados
+  cat("Variable:", col, "\n")
+  cat("Estadístico de Anderson-Darling:", ad_test_result$statistic, "\n")
+  cat("P-valor:", ad_test_result$p.value, "\n")
+  
+  # Evalúa la significancia del resultado
+  if (ad_test_result$p.value <= 0.05) {
+    cat("El test rechaza la hipótesis nula (no sigue una distribución normal).\n\n")
+  } else {
+    cat("El test no rechaza la hipótesis nula (sigue una distribución normal).\n\n")
+  }
+}
+```
+
+```{r}
+# Verificar si existen 0s en las columnas de la 1 a la 5
+columnas_a_verificar <- 1:6
+
+# Aplicar la función a cada columna y verificar si hay 0s
+resultados <- apply(df[, columnas_a_verificar], 2, function(col) any(col == 0))
+
+# Mostrar los resultados
+print(resultados)
+```
+
+```{r}
+library(MASS)
+# Definir el rango de columnas que deseas transformar (1 a 5)
+columnas_a_transformar <- 1:6
+
+# Crear una copia del dataframe original
+df_transformado <- df
+
+# Crear una nueva columna para almacenar los valores óptimos de lambda
+df_transformado$lambda_optimo <- NA
+
+# Crear un vector para almacenar los valores óptimos de lambda
+valores_lambda <- numeric(length(columnas_a_transformar))
+
+# Iterar a través de las columnas y calcular el valor óptimo de lambda
+for (i in 1:length(columnas_a_transformar)) {
+  col <- columnas_a_transformar[i]
+  if (is.numeric(df[, col]) && all(df[, col] > 0)) {
+    # Calcular la transformación de Box-Cox óptima
+    bc <- boxcox(df[, col] ~ 1)
+    
+    # Encontrar el valor óptimo de lambda
+    lambda <- bc$x[which.max(bc$y)]
+    
+    # Almacenar el valor óptimo de lambda en el vector
+    valores_lambda[i] <- lambda
+    
+    # Almacenar el valor óptimo de lambda en la nueva columna
+    df_transformado$lambda_optimo[col] <- lambda
+  }
+}
+
+# Imprimir los valores óptimos de lambda
+print(valores_lambda)
+
+```
+
+```{r}
+library(VGAM)
+
+# Definir el rango de columnas que deseas transformar (1 a 5)
+columnas_a_transformar <- 1:6
+
+# Crear un DataFrame vacío para almacenar los resultados
+df_New <- data.frame(matrix(NA, nrow = nrow(df), ncol = length(columnas_a_transformar)))
+
+# Nombrar las columnas en df_New
+colnames(df_New) <- paste("Columna_", 1:length(columnas_a_transformar))
+
+# Iterar a través de las columnas que deseas transformar
+for (i in 1:length(columnas_a_transformar)){
+  # Realizar la transformación Yeo-Johnson en la columna actual
+  transformed_col <- yeo.johnson(df[,i], lambda = valores_lambda[i])
+  
+  # Asignar el resultado a la columna correspondiente en df_New
+  df_New[, paste("Columna_", i)] <- transformed_col
+}
+
+# Agregar las columnas 6 a 8 de df a df_New
+df_New[, paste("Columna_", 7:9)] <- df[, 7:9]
+
+# Agregar los nombres de las columnas de df a df_New
+colnames(df_New) <- colnames(df)
+
+# Mostrar las primeras filas de df_New
+head(df_New)
+
+```
+
+```{r}
+# Crear un bucle para generar histogramas para las columnas 1 a 5 de df_New
+for (i in 1:6) {
+  # Obtener el nombre de la columna actual
+  col_name <- colnames(df_New)[i]
+  
+  # Crear el histograma con el título correcto
+  hist(df_New[, i], main = paste("Histograma de", col_name))
+}
+```
+```{r}
+
+# Itera a través de las columnas del dataframe
+for (col in colnames(df_New)) {
+  # Realiza el test de Anderson-Darling para cada columna
+  ad_test_result <- ad.test(df_New[[col]])
+  
+  # Imprime los resultados
+  cat("Variable:", col, "\n")
+  cat("Estadístico de Anderson-Darling:", ad_test_result$statistic, "\n")
+  cat("P-valor:", ad_test_result$p.value, "\n")
+  
+  # Evalúa la significancia del resultado
+  if (ad_test_result$p.value <= 0.05) {
+    cat("El test rechaza la hipótesis nula (no sigue una distribución normal).\n\n")
+  } else {
+    cat("El test no rechaza la hipótesis nula (sigue una distribución normal).\n\n")
+  }
+}
+```
+
+```{r}
+# Aplicar la función a cada columna y verificar si hay valores nulos o negativos
+resultados <- apply(df[1:6], 2, function(col) any(is.na(col) | col < 0))
+
+# Mostrar los resultados
+print(resultados)
+
+```
+
+```{r}
+# Definir una función personalizada para aplicar la transformación Box-Cox
+box_cox_transform <- function(x, lambda) {
+  if (lambda == 0) {
+    return(log(x))
+  } else {
+    return((x^lambda - 1) / lambda)
+  }
+}
+
+# Crear un nuevo DataFrame df_NewBC con las transformaciones
+df_NewBC <- df
+for (i in 1:6) {
+  df_NewBC[, i] <- box_cox_transform(df[, i], valores_lambda[i])
+}
+
+# Agregar los nombres de las columnas de df a df_NewBC
+colnames(df_NewBC) <- colnames(df)
+
+# Ver el nuevo DataFrame df_NewBC
+print(df_NewBC)
+
+
+
+```
+
+```{r}
+# Obtener las columnas del 1 al 5
+columnas_a_evaluar <- colnames(df_NewBC)[1:6]
+
+# Itera a través de las columnas seleccionadas
+for (col in columnas_a_evaluar) {
+  # Verifica si hay valores faltantes en la columna
+  if (any(is.na(df_NewBC[[col]]))) {
+    cat("Variable:", col, "contiene valores faltantes. La prueba de Anderson-Darling requiere datos completos.\n\n")
+  } else {
+    # Realiza el test de Anderson-Darling para cada columna
+    ad_test_result <- ad.test(df_NewBC[[col]])
+    
+    # Imprime los resultados
+    cat("Variable:", col, "\n")
+    cat("Estadístico de Anderson-Darling:", ad_test_result$statistic, "\n")
+    cat("P-valor:", ad_test_result$p.value, "\n")
+    
+    # Evalúa la significancia del resultado
+    if (ad_test_result$p.value <= 0.05) {
+      cat("El test rechaza la hipótesis nula (no sigue una distribución normal).\n\n")
+    } else {
+      cat("El test no rechaza la hipótesis nula (sigue una distribución normal).\n\n")
+    }
+  }
+}
+```
+```{r}
+# Define la función z_norm
+z_norm <- function(x) {
+  (x - mean(x)) / sd(x)
+}
+
+# Aplica z_norm a las columnas de la 1 a la 5 y guarda el resultado en M1
+M1 <- df_New
+
+
+# Agregar la columna "drivewheel para el anova" de M a la matriz M1
+M1 <- cbind(M1,M$drivewheel)
+
+
+# Cambiar el nombre de la columna M$price a "price" en el dataframe M1
+colnames(M1)[colnames(M1) == "M$drivewheel"] <- "drivewheel"
+
+
+for (i in 1:9) {
+  M1[, i] <- z_norm(df_New[, i])
+}
+# Ver el nuevo DataFrame df_NewBC
+print(M1)
+
+```
+
+```{r}
+# Suponiendo que tienes un DataFrame llamado M1
+# Ruta y nombre de archivo donde deseas guardar el CSV
+ruta_archivo <- "C:/Users/marlo/OneDrive/Documentos/Semestre 7/Inteligencia artificial avanzada para la ciencia de datos/Modulo1_Estadistica_Blanca/Estadistico1.csv"
+
+# Exportar el DataFrame a un archivo CSV
+write.csv(M1, file = ruta_archivo, row.names = FALSE)
+```
+
+
+
+
